@@ -140,9 +140,12 @@ if (picked.length !== KNIVES.length) {
   let src = read(HERE);
   for (const k of KNIVES) {
     const mine = results.find((x) => x.id === k.id);
-    const row = new RegExp(`(id: '${k.id}'[\\s\\S]*?rc: )'待跑'`);
-    if (!row.test(src)) die(`回写时找不到 ${k.id} 的 rc 占位`);
-    src = src.replace(row, `$1${mine.rc}`);
+    // 三格都要认：'待跑' 占位、上一次盖下的 '1'、以及更早版本留下的裸 1。
+    // 原来只认 '待跑'，于是第一次跑把占位换成实测值之后，第二遍就"找不到占位"而 die(rc=2)
+    // —— 一把跑一次就自毁的闸不能被任何人复跑。归一化成带引号后同值重盖 ⇒ 字节不变，复跑不脏树。
+    const row = new RegExp(`(id: '${k.id}'[\\s\\S]*?rc: )'?(\\d+|待跑)'?`);
+    if (!row.test(src)) die(`回写时找不到 ${k.id} 的 rc 那一格`);
+    src = src.replace(row, `$1'${mine.rc}'`);
   }
   writeFileSync(join(ROOT, HERE), src);
   console.log('  rc 列已回写进 tools/sabotage.mjs（真读回来的退码）');
