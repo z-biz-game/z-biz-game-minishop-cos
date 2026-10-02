@@ -140,7 +140,7 @@
 | K3 | js/core/game.js | 撤销一步放置不退放置步数 | 1 |
 | K4 | js/core/game.js | 随便一步放子都算收尾 | 1 |
 | K5 | tools/playtest.mjs | 键的派发不发 keyDown，页面收不到键 | 1 |
-| K6 | js/main.js | 提示计费不写进 grade() 读的那一个，用过提示照样判 3 星 | 待跑 |
+| K6 | js/main.js | 提示计费不写进 grade() 读的那一个，用过提示照样判 3 星 | 1 |
 
 ## 承诺表
 

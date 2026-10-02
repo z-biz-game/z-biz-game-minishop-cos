@@ -90,7 +90,7 @@ const KNIVES = [
     needle: '  app.game.hints++;',
     repl: '  app.game.hints = app.game.hints;',
     expect: 'verdict 必须降级成「有人指路」',
-    rc: '待跑',
+    rc: '1',
   },
 ];
 
