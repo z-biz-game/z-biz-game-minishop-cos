@@ -15,7 +15,8 @@
     "unit": "for f in test/*.test.mjs; do node \"$f\" || exit 1; done",
     "test": "npm run check && npm run unit",
     "verify": "bash tools/verify.sh",
-    "verify:browser": "BROWSER=1 bash tools/verify.sh"
+    "verify:browser": "BROWSER=1 bash tools/verify.sh",
+    "sabotage": "node tools/sabotage.mjs"
   },
   "keywords": [
     "game",

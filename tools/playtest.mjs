@@ -756,11 +756,33 @@ async function keysScenario(cdp, sessionId, runJS) {
   const afterH = await S();
   rec('H 按出了提示并计了费', afterH.hints === 1 && afterH.hintline.includes('提示'), { hints: afterH.hints, hintline: afterH.hintline });
 
-  await runJS('window.minishop.place(1, 2, 2); 1');
+  // 撤销的靶子必须是一步「没有把海图下完」的放置。harbour-01 只有两条船，第二条落进 (2,2)
+  // 就是那个被穷举证明的唯一解，done 于是立刻关掉整个编辑面 —— js/core/game.js 的
+  // place/retrieve/rotate/tapCell/hint 全按 done 拒，js/main.js 把 undo/rotate/hint 三个按钮
+  // disabled 掉，mouse 腿的「a finished chart ignores the mouse entirely」与 logic 闸的
+  // 「完成后一切都被拒」钉的都是这条规矩。原来的腿先落下收尾那一子、再要求 U 退还它，
+  // 它数的其实一直是「done 之后按钮为什么点不动」，跟「撤销一步放置」没关系：那是证人的前置
+  // 错了，不是规则错了。改的是这条腿怎么测：靶子换成 (0,0) —— 几何合法、但不是唯一解，
+  // done 保持 false，U 才有真对象；而 done 之后按 U 不退账这件事在下面单独有人数着，
+  // 于是这条腿不能靠「把 done 改成可编辑」来给自己变绿。
+  await runJS('window.minishop.place(1, 0, 0); 1');
   const beforeU = await S();
+  rec('这一步落得下去，但它不是收尾那一子',
+    beforeU.steps === 2 && beforeU.ops === 2 && beforeU.done === false, beforeU);
   await keyPress(cdp, sessionId, 'u');
   const afterU = await S();
-  rec('U 撤销了最后一步放置', afterU.steps === beforeU.steps - 1, { beforeU, afterU });
+  rec('U 撤销了最后一步放置',
+    afterU.steps === beforeU.steps - 1 && afterU.ops === beforeU.ops - 1, { beforeU, afterU });
+
+  await runJS('window.minishop.place(1, 2, 2); 1');
+  const afterFinish = await S();
+  rec('第二条船回了位，海图当场判完成',
+    afterFinish.done === true && afterFinish.curtain === true && afterFinish.steps === 2, afterFinish);
+  await keyPress(cdp, sessionId, 'u');
+  const afterFinishedU = await S();
+  rec('完成之后再按 U 一个数都不退',
+    afterFinishedU.steps === afterFinish.steps && afterFinishedU.ops === afterFinish.ops
+    && afterFinishedU.curtain === true, { afterFinish, afterFinishedU });
 
   await keyPress(cdp, sessionId, '0');
   const after0 = await S();
@@ -777,8 +799,8 @@ async function keysScenario(cdp, sessionId, runJS) {
   const afterX = await S();
   rec('一个没有绑定的键什么都不做',
     afterX.ops === before.ops && afterX.steps === before.steps && afterX.hints === before.hints, afterX);
-  rec('前六只派发的键都在页面上的 keydown 里数到了',
-    await runJS('window.__keys.join(",")') === 'r,h,u,0,h,x', await runJS('window.__keys.join(",")'));
+  rec('派发的每一只键都在页面上的 keydown 里数到了',
+    await runJS('window.__keys.join(",")') === 'r,h,u,u,0,h,x', await runJS('window.__keys.join(",")'));
 
   await runJS(`(() => { const M = window.minishop; const want = M.spec().ships;
     want.forEach((w) => { while (M.ships()[want.indexOf(w)].axis !== w.axis) M.rotate(want.indexOf(w)); M.place(want.indexOf(w), w.r, w.c); });
@@ -791,7 +813,7 @@ async function keysScenario(cdp, sessionId, runJS) {
     afterEsc.curtain === false && afterEsc.done === true, afterEsc);
   const keysNow = await runJS('window.__keys.join(",")');
   rec('每一只派发的键都在页面上的 keydown 里数到了（含收尾的 Escape）',
-    keysNow === 'r,h,u,0,h,x,Escape', keysNow);
+    keysNow === 'r,h,u,u,0,h,x,Escape', keysNow);
   return { rows, keys: keysNow };
 }
 

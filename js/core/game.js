@@ -122,6 +122,14 @@ export function retrieve(game, i) {
 // Flip orientation. Free by rule: no op, no step. A ship already on the board only turns if
 // the new shape still fits, so rotating can never be used to slip past a conflict. It is
 // still on the undo stack, because taking a rotation back should not cost anything either.
+//
+// Turning a hull that is already down has to move its footprint with it. `grid`/`own` are
+// what conflict(), tapCell() and progress() read, so an axis-only turn leaves a ghost of the
+// old shape printed on the sea: the next legal drop beside the *new* shape gets refused as
+// 'touch' (and one beside the *old* shape gets accepted), the row/column clues light up for
+// cells nobody occupies, and a cell the hull has just moved onto can still be marked water.
+// The sea print in draw() reads the ship records, which is exactly why this stayed invisible
+// to anything that only looks at the board text.
 export function rotate(game, i) {
   if (game.done) return false;
   const ship = game.ships[i];
@@ -129,7 +137,14 @@ export function rotate(game, i) {
   const axis = ship.axis === 'h' ? 'v' : 'h';
   if (ship.onBoard && conflict(game, i, { r: ship.r, c: ship.c, len: ship.len, axis })) return false;
   game.history.push({ kind: 'rotate', ship: i, from: ship.axis });
-  ship.axis = axis;
+  if (ship.onBoard) {
+    const at = { r: ship.r, c: ship.c, len: ship.len, axis: ship.axis };
+    paint(game, at, i, UNKNOWN); // clear first: the turned shape may share only its head cell
+    ship.axis = axis;
+    paint(game, { ...at, axis }, i, SHIP);
+  } else {
+    ship.axis = axis;
+  }
   return true;
 }
 

@@ -197,6 +197,45 @@ test('旋转 is free, and a hull that would not fit turned is refused', () => {
   eq(rotate(g2, 0), false, 'turning it would run off the bottom edge');
 });
 
+// 浏览器三条腿的红都落在这一条规矩上，而 99 条逻辑断言一条都没抓到它：core 里的旋转测试
+// 全是「先在舰队条上转、再下水」（home() 就是这个顺序），没有任何一处转一条已经下水的船，
+// 于是 rotate() 只改 axis、不改 grid/own 这件事在纯逻辑那半是隐形的。grid 是 conflict()、
+// tapCell() 与 progress() 读的那一份，海图文字 draw() 读的是船的记录 —— 所以板子看起来对、
+// 规则读到的是一份旧足迹。
+test('转过一条已经下水的船，足迹必须跟着走：grid/own 才是冲突与线索读的那一份', () => {
+  const g = fresh();
+  place(g, 0, 2, 0); // (2,0)-(2,1) lying flat
+  eq(rotate(g, 0), true, 'the turn itself is free and allowed');
+  eq(shipsDown(g), [{ r: 2, c: 0, len: 2, axis: 'v' }], 'the record says it now runs down');
+  eq([g.grid[8], g.grid[9], g.grid[12], g.grid[13]], [SHIP, UNKNOWN, SHIP, UNKNOWN],
+    'the wake it left is open sea again — an axis-only turn keeps painting the old shape');
+  eq(g.own.slice(8, 12).join(','), '0,-1,-1,-1', 'and it owns only the cells it now covers');
+  eq(conflict(g, 1, { r: 2, c: 2, len: 1, axis: 'h' }), null,
+    'the proved home of the second hull is legal next to the turned shape');
+  eq(conflict(g, 1, { r: 2, c: 1, len: 1, axis: 'h' }), 'touch', 'the cell the hull vacated is no longer a hull');
+  eq(conflict(g, 1, { r: 3, c: 1, len: 1, axis: 'h' }), 'touch', 'the cell beside the new keel is the one that touches');
+  eq([g.ops, g.steps], [1, 1], 'none of the above spent anything');
+  eq(place(g, 1, 2, 2).ok, true, 'so the last legal drop lands');
+  eq([g.done, g.ops, g.steps], [true, 2, 2], 'and it finishes the chart at par');
+
+  const g2 = fresh();
+  place(g2, 0, 2, 0);
+  rotate(g2, 0);
+  eq(tapCell(g2, 3, 0), null, 'the cell the hull has just turned into is not a water tap');
+  eq(tapCell(g2, 2, 1), 'water', 'the cell it left is open sea and can be marked');
+  undo(g2); // the mark
+  undo(g2); // the turn
+  eq([g2.ships[0].axis, g2.grid[8], g2.grid[9], g2.grid[12]], ['h', SHIP, SHIP, UNKNOWN],
+    'undoing a turn puts the paint back where the hull lay, not on top of the ghost');
+
+  const g3 = fresh();
+  place(g3, 0, 2, 0);
+  eq(progress(g3).rows, [true, true, true, false], 'flat: row 2 hits its 2, row 3 is short of its 1');
+  rotate(g3, 0);
+  eq(progress(g3).rows, [true, true, false, true], 'turned: the clues move with the hull');
+  eq(progress(g3).cols, [true, true, false, true], 'and so do the columns');
+});
+
 test('完成后一切都被拒：done 是一个状态而不是一条提示', () => {
   const g = fresh();
   home(g, 0);
