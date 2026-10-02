@@ -47,7 +47,19 @@ cd "$HERE"
 # 断言条数从每条闸自己打印的 `rows: N fail: M` 现读（tools/harness.mjs 的出口），写死一定漂。
 # test/balance.mjs 不在名单里：它不判对错、只打印测量值（没有 rows: 行，也没有退码语义），
 # 把它当闸跑等于给它一个假的绿。要看它单独 node test/balance.mjs。
-GATES=${GATES:-"syntax check count game logic puzzles server"}
+GATES_RAW=${GATES:-}
+GATES=${GATES_RAW:-"syntax check count game logic puzzles server doctest"}
+# 点名跑几道闸（GATES="server puzzles"）是调试通道，不是把闸摘掉：钉表的"逐名相等"只在
+# 跑全套时要求。部分模式必须自己印出来，否则一次 GATES=check 的绿看起来像整套的绿。
+PARTIAL_LOGIC=0
+[ -n "$GATES_RAW" ] && PARTIAL_LOGIC=1
+
+# 每道逻辑闸的断言条数钉在这里。为什么 rc=0 不够：删掉一条 test() 调用，那道闸还是绿的，
+# 只是少证了一件事；把一道闸从 GATES 名单里摘掉，rc 更是从头到尾没红过。条数是唯一能
+# 让"变窄"当场显形的读数——它不要求断言变强，只要求变窄必须正面改这一行。
+# syntax 那道闸不打印 rows:（它数的是待检文件），所以它进 NA_OK 名单，见下面的比对。
+LOGIC_EXPECTS=${LOGIC_EXPECTS:-"check=13 count=13 game=18 logic=17 puzzles=15 server=24 doctest=22"}
+NA_OK=${NA_OK:-syntax}
 
 gate_src() {
   case $1 in
@@ -85,6 +97,22 @@ for gate in $GATES; do
   N=$(sed -n 's/^rows: \([0-9]*\) fail: [0-9]*$/\1/p' "$log" | head -1)
   echo "$gate ${N:-NA} $grc" >>"$GATE_ROWS"
   TOTAL=$((TOTAL + ${N:-0}))
+  # 条数比对只在闸自己绿的时候做：闸已经红了，再叠一条"条数也不对"只会把真正的根因挤走。
+  if [ "$grc" = 0 ]; then
+    case " $NA_OK " in
+      *" $gate "*) ;;
+      *)
+        kv=$(printf '%s\n' $LOGIC_EXPECTS | grep "^$gate=" | head -1)
+        if [ -z "$kv" ]; then
+          echo "  RED $gate :: 钉表 LOGIC_EXPECTS 里没有这道闸（新闸要正面加条数，摘闸要正面删这一行）"
+          LRC=1
+        elif [ "${kv#*=}" != "${N:-NA}" ]; then
+          echo "  RED $gate :: 条数 ${N:-NA} ≠ 钉着的 ${kv#*=}（断言被删/被并，或这道闸换了口径）"
+          LRC=1
+        fi
+        ;;
+    esac
+  fi
   if [ "$grc" = 0 ]; then
     printf 'ok   %-8s %s 条断言 (GATE_RC=0)\n' "$gate" "${N:-NA}"
   else
@@ -93,7 +121,29 @@ for gate in $GATES; do
   fi
 done
 echo
-printf '逻辑闸合计 %d 条断言（闸：%s）\n' "$TOTAL" "$GATES"
+# 反空转：钉表自己也要被数一遍。钉了 6 条、名单里只有 5 道需要条数的闸，就说明钉表里有一条
+# 是死行（那道闸早就不跑了），而只看上面那段的话它会一直"通过"。
+if [ "$PARTIAL_LOGIC" = 0 ]; then
+  PINNED_N=0
+  for kv in $LOGIC_EXPECTS; do
+    g=${kv%%=*}
+    case " $GATES " in
+      *" $g "*) ;;
+      *) echo "RED 钉表里的 $g 不在闸名单上（死行：这道闸根本不跑）" >&2; LRC=1 ;;
+    esac
+    case " $NA_OK " in *" $g "*) echo "RED 钉表给 $g 钉了条数，可它属于 NA_OK（这道闸不打印 rows:）" >&2; LRC=1 ;; esac
+    PINNED_N=$((PINNED_N + 1))
+  done
+  NEED_N=0
+  for g in $GATES; do case " $NA_OK " in *" $g "*) ;; *) NEED_N=$((NEED_N + 1));; esac; done
+  if [ "$PINNED_N" != "$NEED_N" ]; then
+    echo "RED 钉表 $PINNED_N 条 vs 名单里 $NEED_N 道要条数的闸：有一道闸没被钉住" >&2
+    LRC=1
+  fi
+else
+  echo "NOTE 部分闸模式（GATES=$GATES）：钉表逐名相等的检查跳过，全套请不带 GATES 跑"
+fi
+printf '逻辑闸合计 %d 条断言（闸：%s；钉表：%s）\n' "$TOTAL" "$GATES" "$LOGIC_EXPECTS"
 printf 'gate-rows：%s\n' "$(tr '\n' ' ' <"$GATE_ROWS")"
 if [ "$LRC" = 0 ]; then echo "logic: PASS"; else echo "logic: FAIL（红的那道闸上面已点名）"; fi
 
@@ -161,7 +211,10 @@ trap cleanup EXIT
 
 FAILED=0
 REPORTS="$TMPD/reports.txt"; : >"$REPORTS"; export REPORTS
-LEGS=${LEGS:-core play win mouse touch keys save}
+LEGS_RAW=${LEGS:-}
+LEGS=${LEGS_RAW:-core play win mouse touch keys save}
+PARTIAL_BROWSER=0
+[ -n "$LEGS_RAW" ] && PARTIAL_BROWSER=1
 
 # ----------------------------------------------------------------- the leg plan, in one place
 #
@@ -187,6 +240,16 @@ leg_plan() {
 
 # golden：每种 URL 形态应有的 report 份数（core 2 + play 1 + win 1 + mouse 1 + touch 1 + keys 1 + save 4）。
 GOLDEN_PER_SHAPE=${GOLDEN_PER_SHAPE:-11}
+
+# 每份报告的断言条数同样钉死（值取自实跑打印的 "N checks"）。GOLDEN_PER_SHAPE 只数"有几份报告"，
+# 数不到"每份报告里还剩几条断言"：把 playtest.mjs 里一整个 suite 的 test() 删光，份数一条不差，
+# 而那份报告从此什么都不证。条数是这份表里唯一挡得住那种退化的读数。
+BROWSER_EXPECTS=${BROWSER_EXPECTS:-"boot=14 routes=14 play=25 win=14 pointer=20 touch=13 keys=16 save=14 reloaded=8 partial=6 frag=4"}
+expect_checks() {   # $1 = run 名；钉不到就回空，调用方必须把它当红，不能当"没有期望"
+  local kv
+  kv=$(printf '%s\n' $BROWSER_EXPECTS | grep "^$1=" | head -1)
+  [ -n "$kv" ] && printf '%s' "${kv#*=}"
+}
 
 leg_start() {   # $1 = leg name, $2 = base url
   UDD=$(mktemp -d "$TMPD/udd-$1.XXXXXX")
@@ -241,6 +304,12 @@ for r in rows:
         print('  FAIL %-64s %s' % (r['test'], json.dumps(det, ensure_ascii=False)[:220] if det is not None else ''))
 if not isinstance(d.get('fail'), int):
     print('  RED %s/%s：RESULT 里的 fail 不是整数，无法判定' % (leg, run)); sys.exit(1)
+exp = os.environ.get('EXPECT_CHECKS') or ''
+if exp and not selfmode:
+    # 种错模式下每条报告都被 emit() 多塞一行 1===2，那一行的条数归 SELFTEST 那段自己数，
+    # 所以这里只在正常跑时比对钉值。
+    if exp != str(len(rows)):
+        print('  RED %s/%s：条数 %d ≠ 钉着的 %s（这份报告的断言被删/被并，或它换了口径）' % (leg, run, len(rows), exp)); sys.exit(1)
 planted = sum(1 for r in rows if str(r.get('test', '')).startswith('GATE_SELFTEST') and not r.get('pass'))
 if selfmode:
     # 先记账再判：没种上的报告也写进对数表，末尾那句「实到几份 / 点名几份」才是有分母的数。
@@ -264,6 +333,8 @@ collect() {   # 打印证据行，再把 RESULT 交给 parse
 run_page() {   # $1 = scenario token, $2 = nav|nonav, $3 = run 名
   local token="$1" mode="$2" name="${3:-$1}"
   export RESULT_FILE="$TMPD/${LEGTAG}-${name}.out"
+  export EXPECT_CHECKS="$(expect_checks "$name")"
+  [ -n "$EXPECT_CHECKS" ] || { echo "  RED $LEGTAG/$name：BROWSER_EXPECTS 里没有这一份报告的条数（新 run 要正面钉一条）" >&2; FAILED=1; }
   if [ "$mode" = nav ]; then
     node tools/playtest.mjs eval "@$token" >"$RESULT_FILE" 2>"$TMPD/${LEGTAG}-${name}.console.log"
   else
@@ -278,6 +349,8 @@ run_page() {   # $1 = scenario token, $2 = nav|nonav, $3 = run 名
 
 run_leg_gesture() {   # $1 = touch|keys
   export RESULT_FILE="$TMPD/${LEGTAG}-$1.out"
+  export EXPECT_CHECKS="$(expect_checks "$1")"
+  [ -n "$EXPECT_CHECKS" ] || { echo "  RED $LEGTAG/$1：BROWSER_EXPECTS 里没有这条腿的条数" >&2; FAILED=1; }
   node tools/playtest.mjs leg "$1" >"$RESULT_FILE" 2>"$TMPD/${LEGTAG}-$1.console.log"
   collect "$1" "$LEGTAG"
   if [ -s "$TMPD/${LEGTAG}-$1.console.log" ]; then
@@ -288,6 +361,8 @@ run_leg_gesture() {   # $1 = touch|keys
 
 run_frag() {   # 对照 run：片段导航不算重载
   export RESULT_FILE="$TMPD/${LEGTAG}-frag.out"
+  export EXPECT_CHECKS="$(expect_checks frag)"
+  [ -n "$EXPECT_CHECKS" ] || { echo "  RED save/frag：BROWSER_EXPECTS 里没有 frag 的条数" >&2; FAILED=1; }
   node tools/playtest.mjs nav "${FRAGBASE}#gate-fragment-nav" same >"$RESULT_FILE" 2>"$TMPD/${LEGTAG}-frag.console.log"
   collect frag save
 }
@@ -317,6 +392,32 @@ for base in "${SHAPES[@]}"; do
     leg_stop
   done
 done
+
+# 条数钉表的反空转：钉表必须和腿计划现算出来的 run 名单**逐名相等**。
+# 只查"每份报告条数对不对"是自我比较——把一整个 run 从 leg_plan 里删掉，那份报告连 EXPECTS
+# 都不会去读，钉表里那一行从此变成死行。所以这里两头都数。
+RUN_NAMES=""
+for leg in $LEGS; do
+  PLAN=$(leg_plan "$leg") || { FAILED=1; continue; }
+  IFS='|' read -ra RS <<< "$PLAN"
+  for spec in "${RS[@]}"; do RUN_NAMES="$RUN_NAMES ${spec%% *}"; done
+done
+if [ "$PARTIAL_BROWSER" = 0 ]; then
+  for n in $RUN_NAMES; do
+    [ -n "$(expect_checks "$n")" ] || { echo "  RED 条数钉表缺 $n 这一份报告（新 run 没被钉住）" >&2; FAILED=1; }
+  done
+  for n in $(printf '%s\n' $BROWSER_EXPECTS | sed 's/=.*//'); do
+    case " $RUN_NAMES " in *" $n "*) ;; *) echo "  RED 条数钉表钉着 $n，可腿计划里已经没有它了（死行：这份报告根本不跑）" >&2; FAILED=1 ;; esac
+  done
+  N_PIN=$(printf '%s\n' $BROWSER_EXPECTS | wc -l | tr -d ' ')
+  N_RUN=$(printf '%s\n' $RUN_NAMES | wc -l | tr -d ' ')
+  if [ "$N_PIN" != "$N_RUN" ] || [ "$N_RUN" != "$GOLDEN_PER_SHAPE" ]; then
+    echo "  RED 条数钉表 $N_PIN 条 / 腿计划 $N_RUN 份报告 / golden 每形态 $GOLDEN_PER_SHAPE 份：三者必须同为一份计划" >&2
+    FAILED=1
+  fi
+else
+  echo "NOTE 部分腿模式（LEGS=$LEGS）：逐名相等的检查跳过，全套请不带 LEGS 跑（每份报告的条数照旧比对）"
+fi
 
 if [ "$SELF" = 1 ]; then
   echo

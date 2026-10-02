@@ -82,6 +82,16 @@ const KNIVES = [
     expect: '派发的每一只键都在页面上的 keydown 里数到了',
     rc: '1',
   },
+  {
+    // 这一把刀打的是"两个计数器"那一类：壳自己记一份、core 的 grade() 读另一份，
+    // 于是 2 星那一档永远不会出现。逻辑闸看不见它（它只测 core），只有收尾那一屏会说谎。
+    id: 'K6', file: 'js/main.js', cmd: KEYS, timeout: 900000,
+    why: '提示计费不写进 grade() 读的那一个：用过提示照样判「一子不差」',
+    needle: '  app.game.hints++;',
+    repl: '  app.game.hints = app.game.hints;',
+    expect: 'verdict 必须降级成「有人指路」',
+    rc: '待跑',
+  },
 ];
 
 const only = process.argv.slice(2);

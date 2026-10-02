@@ -784,6 +784,14 @@ async function keysScenario(cdp, sessionId, runJS) {
     afterFinishedU.steps === afterFinish.steps && afterFinishedU.ops === afterFinish.ops
     && afterFinishedU.curtain === true, { afterFinish, afterFinishedU });
 
+  // 提示必须能在收尾那一屏留下痕迹。js/core/game.js 的 grade() 读的是 game.hints，
+  // 而计费一度只写在壳自己的 app.hints 上：那一档「有人指路」因此永远不会出现，
+  // 用过提示的盘照样判「一子不差」，而 tally 那行明明印着「提示 1」。
+  // 这一条数的就是那一个数有没有走到评星眼里——逻辑闸看不见它，两个计数器都在壳里。
+  rec('用过提示之后收尾，verdict 必须降级成「有人指路」',
+    afterFinish.hints === 1 && afterFinish.steps === afterFinish.par && afterFinish.verdict === '有人指路',
+    { hints: afterFinish.hints, steps: afterFinish.steps, par: afterFinish.par, verdict: afterFinish.verdict });
+
   await keyPress(cdp, sessionId, '0');
   const after0 = await S();
   rec('数字 0 重开了这一关', after0.ops === 0 && after0.steps === 0 && after0.done === false, after0);

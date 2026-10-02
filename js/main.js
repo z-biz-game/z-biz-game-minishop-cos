@@ -33,7 +33,6 @@ const app = {
   route: null,
   puzzle: null,
   game: null,
-  hints: 0,
   label: '',
   day: null,
 };
@@ -93,7 +92,6 @@ function setGame(puzzle, label) {
   app.puzzle = puzzle;
   app.label = label || app.label;
   app.game = createGame(puzzle);
-  app.hints = 0;
   view.attach(app.game);
   el.curtain.hidden = true;
   say('');
@@ -263,7 +261,7 @@ function after(line) {
 function finish() {
   const puzzle = app.puzzle;
   const g = app.game;
-  const rec = store.solve(puzzle.id, { ops: g.ops, steps: g.steps, par: g.par, hints: app.hints });
+  const rec = store.solve(puzzle.id, { ops: g.ops, steps: g.steps, par: g.par, hints: g.hints });
   if (app.day) store.markDaily(app.day, puzzle.id);
   let nextIndex = 0;
   if (app.mode === 'campaign') {
@@ -273,7 +271,7 @@ function finish() {
   const gr = grade(g);
   el.stars.textContent = stars(gr.stars);
   el.verdict.textContent = gr.label;
-  el.tally.innerHTML = `操作 <b>${g.ops}</b> · 放置 <b>${g.steps}</b>（下限 ${g.par}）· 提示 <b>${app.hints}</b>`
+  el.tally.innerHTML = `操作 <b>${g.ops}</b> · 放置 <b>${g.steps}</b>（下限 ${g.par}）· 提示 <b>${g.hints}</b>`
     + `<br>解数 <b>1</b> 已由穷举证明 · 推理深度 <b>${g.depth}</b>`
     + (rec.bestSteps === g.steps ? '<br>这是这一关的最好成绩' : '');
   el.next.hidden = !nextIndex;
@@ -371,7 +369,7 @@ el.hint.addEventListener('click', () => {
     say('没有可提示的了 —— 这张海图已经完成');
     return;
   }
-  app.hints++;
+  app.game.hints++; // 计费写在 grade() 读的那一个计数器上：另立一个 app.hints 会让「用过提示」这件事在评星眼里从没发生过
   if (h.kind === 'ship') {
     // Highlight the hull that belongs there: the one already sitting somewhere else with
     // that length, or the one already nailed to the right cells.
@@ -390,7 +388,6 @@ el.hint.addEventListener('click', () => {
 
 function restart() {
   reset(app.game);
-  app.hints = 0;
   el.curtain.hidden = true;
   view.attach(app.game); // clears the selection and the rebound flash along with the hulls
   render();
@@ -450,7 +447,7 @@ window.minishop = {
       steps: g && g.steps,
       par: g && g.par,
       depth: g && g.depth,
-      hints: app.hints,
+      hints: g ? g.hints : 0,
       done: !!(g && g.done),
       history: g ? g.history.length : 0,
       unlocked: store.unlocked,
@@ -493,7 +490,7 @@ window.minishop = {
   tap(r, c) { return commitTap(r, c); },
   undo() { el.undo.click(); return app.game ? { ops: app.game.ops, steps: app.game.steps } : null; },
   reset() { restart(); },
-  hintOnce() { el.hint.click(); return { hints: app.hints, line: el.hintline.textContent }; },
+  hintOnce() { el.hint.click(); return { hints: app.game.hints, line: el.hintline.textContent }; },
   click(id) { el[id].click(); return true; },
   store,
 };
