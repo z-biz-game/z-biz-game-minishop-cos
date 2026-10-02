@@ -51,7 +51,10 @@ function parseHash(hash = location.hash) {
   if (p[0] === 'random') return { mode: 'random', tier: p[1] || TIERS[0].key, key: p[2] || null };
   if (p[0] === 'lot') return { mode: 'lot', id: p[1] };
   const n = p[0] === 'c' || p[0] === 'campaign' ? Number(p[1]) : Number(p[0]);
-  return { mode: 'campaign', index: clampIndex(n) };
+  // `asked` is kept so apply() can tell a clamped route from a written one: 999 has to become
+  // #/c/48 in the address bar too, or a reload — and everyone you shared it with — is told a
+  // different story than the panel printed.
+  return { mode: 'campaign', index: clampIndex(n), asked: n };
 }
 
 function linkFor(rt) {
@@ -280,8 +283,13 @@ function finish() {
 }
 
 function go(hash) {
+  // apply() runs on this turn, not on the queued hashchange. Without it, anything that asks
+  // the router and then reads the board on the same turn — the browser suites, and a user who
+  // clicks 下一关 and looks at the panel before the event loop comes back — is looking at the
+  // *previous* chart while the URL already says the new one. The hashchange listener stays:
+  // it is what serves back/forward, where nothing called go().
   if (location.hash === hash) apply();
-  else location.hash = hash;
+  else { location.hash = hash; apply(); }
 }
 
 function apply() {
@@ -292,7 +300,15 @@ function apply() {
     // A bare #/random/lone would mean a different chart on every visit and an
     // unreproducible link, so the token is minted once and written back into the URL.
     location.replace(`${location.pathname}${location.search}#/random/${rt.tier}/${token()}`);
-    return;
+    // replace() fires no hashchange, so the minted route has to be resolved here: this is the
+    // one place the router re-enters itself, and it is bounded because the second pass has a key.
+    return apply();
+  }
+  if (rt.mode === 'campaign' && String(rt.asked) !== String(rt.index)) {
+    // 越界关号被夹到梯子两端之后，URL 也得跟着夹：replace 不进历史、不触发 hashchange，
+    // 所以这一趟路由要自己走完（第二趟 asked === index，不会再进来）。
+    location.replace(`${location.pathname}${location.search}#/c/${rt.index}`);
+    return apply();
   }
   const r = resolve(rt);
   if (!r.puzzle) {

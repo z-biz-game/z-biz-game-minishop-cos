@@ -123,9 +123,14 @@ export function createView(canvas, { onPlace, onRetrieve, onTapCell, onRotate, o
   }
 
   // Where the head cell of a hull held at local point (x, y) would land, in board cells.
+  // cellPoint() / shipPoint() hand out the *centre* of a cell, and the pointer legs aim with
+  // them so a test presses where a human presses. Mapping a centre back to a cell therefore
+  // has to floor: with Math.round, the centre of (r,c) is r+0.5 and lands in (r+1,c+1) — every
+  // drop, water mark and double click in the game shifted one row down and one column right,
+  // and the last row/column fell off the board entirely (a tap there did nothing at all).
   function headAt(x, y) {
     const { cell, ox, oy } = geom;
-    return { r: Math.round((y - oy) / cell), c: Math.round((x - ox) / cell) };
+    return { r: Math.floor((y - oy) / cell), c: Math.floor((x - ox) / cell) };
   }
 
   function shipAtPoint(p) {
