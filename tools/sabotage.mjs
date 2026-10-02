@@ -46,7 +46,7 @@ const KNIVES = [
     paint(game, { ...at, axis }, i, SHIP);`,
     repl: '    ship.axis = axis;',
     expect: 'the wake it left is open sea again',
-    rc: '待跑',
+    rc: 1,
   },
   {
     id: 'K2', file: 'js/main.js', cmd: KEYS, timeout: 900000,
@@ -54,7 +54,7 @@ const KNIVES = [
     needle: '  el.undo.disabled = !g.history.length || g.done;',
     repl: '  el.undo.disabled = !g.history.length;',
     expect: '完成之后再按 U 一个数都不退',
-    rc: '待跑',
+    rc: 1,
   },
   {
     id: 'K3', file: 'js/core/game.js', cmd: KEYS, timeout: 900000,
@@ -63,7 +63,7 @@ const KNIVES = [
     game.steps--; // only a placement ever spent a step`,
     repl: '    game.ops--;',
     expect: 'U 撤销了最后一步放置',
-    rc: '待跑',
+    rc: 1,
   },
   {
     id: 'K4', file: 'js/core/game.js', cmd: KEYS, timeout: 900000,
@@ -71,7 +71,7 @@ const KNIVES = [
     needle: '  return validate(game.spec, placementOf(game.ships)) === null;',
     repl: '  return game.ships.every((s) => s.onBoard);',
     expect: '这一步落得下去，但它不是收尾那一子',
-    rc: '待跑',
+    rc: 1,
   },
   {
     id: 'K5', file: 'tools/playtest.mjs', cmd: KEYS, timeout: 900000,
@@ -80,7 +80,7 @@ const KNIVES = [
   if (text) await cdp.send('Input.dispatchKeyEvent', { type: 'char', ...base, text }, sessionId);`,
     repl: `  if (text) await cdp.send('Input.dispatchKeyEvent', { type: 'char', ...base, text }, sessionId);`,
     expect: '派发的每一只键都在页面上的 keydown 里数到了',
-    rc: '待跑',
+    rc: 1,
   },
 ];
 
