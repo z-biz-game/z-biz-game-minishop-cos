@@ -152,6 +152,7 @@
 | 每条断言都被证明"会红" | `tools/sabotage.mjs` 六把刀 | `node tools/sabotage.mjs` |
 | 变窄（删断言/摘闸）当场显形 | `LOGIC_EXPECTS` + `BROWSER_EXPECTS` + `GOLDEN_PER_SHAPE` | `bash tools/verify.sh` |
 | 页面在两种 URL 形态下都活着 | 浏览器闸 ×2 形态 | `BROWSER=1 bash tools/verify.sh` |
+| 线上站点跑的是同一套闸 | `BASE_URL` 只是把第三种形态追加进同一份腿计划，条数钉表逐份照比 | `BASE_URL=https://z-biz-game.github.io/z-biz-game-minishop-cos/ BROWSER=1 bash tools/verify.sh` |
 | 提交只可能是 bot 身份 | 仓库 `user.email = bot@z-biz-game.dev` | `git log -1 --format=%ae` |
 
 ## 本地跑
