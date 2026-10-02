@@ -46,7 +46,7 @@ const KNIVES = [
     paint(game, { ...at, axis }, i, SHIP);`,
     repl: '    ship.axis = axis;',
     expect: 'the wake it left is open sea again',
-    rc: 1,
+    rc: '1',
   },
   {
     id: 'K2', file: 'js/main.js', cmd: KEYS, timeout: 900000,
@@ -54,7 +54,7 @@ const KNIVES = [
     needle: '  el.undo.disabled = !g.history.length || g.done;',
     repl: '  el.undo.disabled = !g.history.length;',
     expect: '完成之后再按 U 一个数都不退',
-    rc: 1,
+    rc: '1',
   },
   {
     id: 'K3', file: 'js/core/game.js', cmd: KEYS, timeout: 900000,
@@ -63,7 +63,7 @@ const KNIVES = [
     game.steps--; // only a placement ever spent a step`,
     repl: '    game.ops--;',
     expect: 'U 撤销了最后一步放置',
-    rc: 1,
+    rc: '1',
   },
   {
     id: 'K4', file: 'js/core/game.js', cmd: KEYS, timeout: 900000,
@@ -71,7 +71,7 @@ const KNIVES = [
     needle: '  return validate(game.spec, placementOf(game.ships)) === null;',
     repl: '  return game.ships.every((s) => s.onBoard);',
     expect: '这一步落得下去，但它不是收尾那一子',
-    rc: 1,
+    rc: '1',
   },
   {
     id: 'K5', file: 'tools/playtest.mjs', cmd: KEYS, timeout: 900000,
@@ -80,7 +80,7 @@ const KNIVES = [
   if (text) await cdp.send('Input.dispatchKeyEvent', { type: 'char', ...base, text }, sessionId);`,
     repl: `  if (text) await cdp.send('Input.dispatchKeyEvent', { type: 'char', ...base, text }, sessionId);`,
     expect: '派发的每一只键都在页面上的 keydown 里数到了',
-    rc: 1,
+    rc: '1',
   },
 ];
 
@@ -118,6 +118,14 @@ for (const k of picked) {
   const named = r.out.includes(k.expect);
   const red = r.rc !== 0 && named;
   console.log(`  ${k.id} rc=${r.rc} 点名=${named ? '是' : '否'} → ${red ? '红得对' : '这一刀没能把闸打红'}`);
+  // 红也要把它点名的那一行留在日志里：只有 rc 和"点名=是"的话，
+  // 一次起不动 Chrome 的崩溃也可能被读成"这条断言真的红了"。
+  if (red) {
+    const hit = r.out.split('\n').filter((l) => l.includes(k.expect)).slice(0, 2);
+    if (!hit.length) die(`${k.id} 说点名了，却在输出里找不回那一行：证据没落进日志`);
+    console.log(hit.map((l) => `    | ${l.trim().slice(0, 200)}`).join('\n'));
+    console.log(`    | 腿的 checks=${/RESULT .*"checks":(\d+)/.exec(r.out)?.[1] ?? '无 RESULT 行（腿没跑到收尾）'}`);
+  }
   if (!red) console.log(r.out.split('\n').filter((l) => /FAIL|RED |ERROR|error:/.test(l)).slice(0, 8).map((l) => `    | ${l}`).join('\n'));
   if (k.file !== HERE && nowDirty.includes(k.file)) die(`${k.id} 恢复之后 ${k.file} 还是脏的，不带脏树跑下一把`);
   results.push({ id: k.id, rc: r.rc, named, red });
