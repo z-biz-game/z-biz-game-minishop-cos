@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 没有打包这一步：页面是裸 ES module，部署就是拷文件。只有这三条路径被 index.html 引用得到
+      # （js/ 里含 js/core、js/data 与 js/view.js），所以把 server.cjs、electron/、tools/ 留在
+      # 仓库里而不是产物里——`path: .` 会连它们一起上传。
+      - name: Assemble static site
+        run: |
+          mkdir _site
+          cp index.html _site/
+          cp -r css js _site/
+          # 产物里不能有开发用的东西：这条 grep 一命中就说明上面的白名单漏了。
+          if grep -rIl "server.cjs\|electron" _site --include=*.html --include=*.js >/dev/null 2>&1; then
+            echo "_site 里出现了指向 server.cjs / electron 的引用"; exit 1
+          fi
+      - uses: actions/configure-pages@v5
+        with:
+          use-actions-v4-deploy-action: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
