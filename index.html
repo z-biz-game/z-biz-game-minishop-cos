@@ -54,6 +54,28 @@
       <button type="button" id="btn-fullscreen" aria-pressed="false" title="全屏 (F)">全屏</button>
     </div>
     <div class="shelf" id="shelf"></div>
+    <!--
+      玩法说明。下面每一条都对着 js/core/check.js 的 validate() 逐项写：
+      目标/线索含义出自 SPEC 的行列表（model.js:3-7），
+      六条判据与它们不成立时的原话出自 check.js 的文件头注释与 validate()。
+      改 check.js 的判据时这个块要跟着改——它不是另一套规则，是同一套规则的人话。
+    -->
+    <details class="about">
+      <summary>玩法：怎么摆才算对</summary>
+      <p><b>目标</b>：把这一关舰队清单里的每条船都摆进海图，让每一行的、每一列的数字同时兑现。数字全对上、且没有两条船挨着，这一关就成了。</p>
+      <p><b>线索怎么读</b>：海图左边的数字是<b>这一行</b>要被船占住的格子数，上边的数字是<b>这一列</b>要占住的格数。写着 <code>-</code> 的行/列是自由行自由列（<code>FREE = -1</code>，<code>js/core/model.js:19</code>），它不约束占格数。</p>
+      <p><b>怎么操作</b>：从右边的架子上把一条船<b>拖</b>进海图，它会横放；按「旋转」改成竖放，再拖到位。在空白海图上单击一下是标记水（<code>UNKNOWN / SHIP / WATER</code> 三态，<code>js/core/model.js:7</code>）。撤销只退你动过的一步。</p>
+      <p><b>判对判错由谁说</b>：<code>js/core/check.js</code> 是独立检查器——它不碰位掩码、不碰行计划、不 import 计数器与求解器，只用嵌套循环和一张朴素占格表把上面那句话重新推一遍。它按顺序查六件事，任何一件不对就报一句人话：</p>
+      <ol>
+        <li>题面自洽：Σ行线索 = Σ列线索 = Σ船长。</li>
+        <li>每条船都在图内。</li>
+        <li>两条船不共格。</li>
+        <li>两条船不挨着——<b>边和角都算</b>（Akaji 规则）。</li>
+        <li>每条受约束的行/列恰好占那么多个格。</li>
+        <li>放下船长度的多重集正好是舰队清单。</li>
+      </ol>
+      <p>第 1 条那条恒等式是地基：数同一批格子的三种方法必须互相同意，否则这道题根本不描述任何一支舰队。</p>
+    </details>
     <details class="about">
       <summary>这一关的数字从哪来</summary>
       <p>解数由 <code>js/core/count.js</code> 逐行穷举证出：数字是 1 就意味着它走完了每一种可能，只找到一种摆法。<b>船与船不得相邻，斜角也算相邻</b>——这条规则写进了求解、校验和绘制三处，改了它解数就会变。</p>
