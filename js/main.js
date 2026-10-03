@@ -291,23 +291,28 @@ function go(hash) {
 }
 
 function apply() {
-  const rt = parseHash();
-  app.route = rt;
-  app.mode = rt.mode;
+  let rt = parseHash();
   if (rt.mode === 'random' && !rt.key) {
     // A bare #/random/lone would mean a different chart on every visit and an
     // unreproducible link, so the token is minted once and written back into the URL.
-    location.replace(`${location.pathname}${location.search}#/random/${rt.tier}/${token()}`);
-    // replace() fires no hashchange, so the minted route has to be resolved here: this is the
-    // one place the router re-enters itself, and it is bounded because the second pass has a key.
-    return apply();
+    const key = token();
+    location.replace(`${location.pathname}${location.search}#/random/${rt.tier}/${key}`);
+    // The minted route is carried on `rt` rather than resolved by re-entering apply().
+    // location.replace is a navigation: it fires no hashchange, and anything that refuses
+    // to move location.hash (a denied navigation, a sandboxed frame, the load probe) left
+    // the router re-reading the same bare hash forever — the stack blew up inside
+    // parseHash's String.replace and the page never finished loading. Same URL, same chart,
+    // no recursion.
+    rt = { mode: 'random', tier: rt.tier, key };
   }
   if (rt.mode === 'campaign' && String(rt.asked) !== String(rt.index)) {
-    // 越界关号被夹到梯子两端之后，URL 也得跟着夹：replace 不进历史、不触发 hashchange，
-    // 所以这一趟路由要自己走完（第二趟 asked === index，不会再进来）。
+    // 越界关号被夹到梯子两端之后，URL 也得跟着夹。规范化同样落在 rt 上：夹完的关号就是这一趟
+    // 该用的值，不该回头重读一个未必动过的 location.hash。
     location.replace(`${location.pathname}${location.search}#/c/${rt.index}`);
-    return apply();
+    rt = { mode: 'campaign', index: rt.index, asked: rt.index };
   }
+  app.route = rt;
+  app.mode = rt.mode;
   const r = resolve(rt);
   if (!r.puzzle) {
     say('这一档还没有烤好的海图');
