@@ -55,7 +55,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .readout .best dd { color: var(--wake); }
 .readout .proof dd { color: #8fd6a4; }
 
-.controls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+/* 6 列：全屏开关接进来后是一行 6 颗（旋转/撤销/提示/重开/分享/全屏），不留半行尾巴。
+   面板 330px − padding 32 − gap 30 = 268px，÷6 ≈ 44px/格，12px 中文两字（24px）放得下。 */
+.controls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .controls button { padding: 10px 2px; font-size: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, 0.03); color: var(--ink); }
 .controls button:hover:not(:disabled) { border-color: rgba(230, 182, 86, 0.5); color: var(--brass); }
 .controls button:disabled { opacity: 0.35; cursor: not-allowed; }
