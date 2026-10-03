@@ -435,6 +435,18 @@ window.addEventListener('keydown', (ev) => {
 view.measure();
 apply();
 
+// ---- 减弱动效（prefers-reduced-motion）----
+// 跟随系统设置，并且**运行中改设置立刻生效**：加 addEventListener('change')，老 Safari
+// 只有 addListener，故两条都挂（同一 query 的两个 API 指向同一个 MediaQueryList）。
+(function wireReducedMotion() {
+  if (typeof matchMedia !== 'function') return;
+  const mq = matchMedia('(prefers-reduced-motion: reduce)');
+  const applyFlag = () => view.setReduceMotion(mq.matches);
+  if (mq.addEventListener) mq.addEventListener('change', applyFlag);
+  else if (mq.addListener) mq.addListener(applyFlag);
+  applyFlag();
+})();
+
 // The test hook. Everything a browser assertion needs, and nothing the game depends on:
 // the panel is driven by the same commit* functions these call, so a test that presses a
 // button and a test that reads state are looking at one set of counters.

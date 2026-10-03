@@ -51,6 +51,12 @@ export function createView(canvas, { onPlace, onRetrieve, onTapCell, onRotate, o
   let flash = null; // { cells, reason, until }
   let selected = -1;
   let raf = 0;
+  // ---- 减弱动效（prefers-reduced-motion）----
+  // 被拒的一次投放，仓里唯一的画面证据就是这 520ms 里由 0.55 淡出的那几块红格子。
+  // 淡出是动效，**红是信号**——所以减弱动效下不动颜色、不缩短寿命，只把 alpha 钉在
+  // 满值：红格子照样按原时长出现、照样告诉玩家"这一手不成立、原因是 reason"，
+  // 少的只是"淡下去"这段过程。
+  let reduceMotion = false;
 
   // ---------------------------------------------------------------- geometry
 
@@ -404,7 +410,7 @@ export function createView(canvas, { onPlace, onRetrieve, onTapCell, onRotate, o
       if (t <= 0) {
         flash = null;
       } else {
-        ctx.globalAlpha = 0.55 * t;
+        ctx.globalAlpha = reduceMotion ? 0.55 : 0.55 * t;
         ctx.fillStyle = BAD;
         for (const cellIdx of flash.cells) {
           const r = Math.floor(cellIdx / cols);
@@ -483,6 +489,15 @@ export function createView(canvas, { onPlace, onRetrieve, onTapCell, onRotate, o
     },
     flashReason() {
       return flash ? flash.reason : null;
+    },
+    // 幂等：切到当帧就重画，红格子停在半路而不是等它淡完。运行中改设置立刻生效。
+    setReduceMotion(on) {
+      reduceMotion = !!on;
+      draw();
+      return reduceMotion;
+    },
+    isReducedMotion() {
+      return reduceMotion;
     },
   };
 }
