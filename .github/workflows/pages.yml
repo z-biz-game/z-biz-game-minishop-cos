@@ -19,18 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # 没有打包这一步：页面是裸 ES module，部署就是拷文件。只有这三条路径被 index.html 引用得到
-      # （js/ 里含 js/core、js/data 与 js/view.js），所以把 server.cjs、electron/、tools/ 留在
-      # 仓库里而不是产物里——`path: .` 会连它们一起上传。
+      # 拷哪些不写在这里——写在 tools/assemble-site.sh，本地闸与 CI 调同一支脚本。
+      # 以前这里是手抄的三行 cp（index.html/css/js），于是页面后来引用的
+      # manifest.webmanifest、sw.js、icons/* 全都上不了线：线上 404，而 CI 一路绿，
+      # 因为没有任何一步加载过那份产物。服务器、台架、文档、node_modules 仍在 artifact 外面。
       - name: Assemble static site
-        run: |
-          mkdir _site
-          cp index.html _site/
-          cp -r css js _site/
-          # 产物里不能有开发用的东西：这条 grep 一命中就说明上面的白名单漏了。
-          if grep -rIl "server.cjs\|electron" _site --include=*.html --include=*.js >/dev/null 2>&1; then
-            echo "_site 里出现了指向 server.cjs / electron 的引用"; exit 1
-          fi
+        run: bash tools/assemble-site.sh _site
+      - name: Deploy set gate (checks the very _site about to be uploaded)
+        run: node tools/deploy-set.mjs _site
       # v5 没有 use-actions-v4-deploy-action 这个输入（kurotto 那份会打出 Unexpected input 警告），
       # 它什么也不做，留着只会让人以为它决定了 deploy 用哪一版。
       - uses: actions/configure-pages@v5

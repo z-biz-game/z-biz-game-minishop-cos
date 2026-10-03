@@ -16,7 +16,9 @@
     "test": "npm run check && npm run unit",
     "verify": "bash tools/verify.sh",
     "verify:browser": "BROWSER=1 bash tools/verify.sh",
-    "sabotage": "node tools/sabotage.mjs"
+    "sabotage": "node tools/sabotage.mjs",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "keywords": [
     "game",
