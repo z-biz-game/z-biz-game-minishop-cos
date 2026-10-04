@@ -141,7 +141,7 @@ if [ "$PARTIAL_LOGIC" = 0 ]; then
     LRC=1
   fi
 else
-  echo "NOTE 部分闸模式（GATES=$GATES）：钉表逐名相等的检查跳过，全套请不带 GATES 跑"
+  echo "NOTE 部分闸模式（GATES=${GATES}）：钉表逐名相等的检查跳过，全套请不带 GATES 跑"
 fi
 printf '逻辑闸合计 %d 条断言（闸：%s；钉表：%s）\n' "$TOTAL" "$GATES" "$LOGIC_EXPECTS"
 printf 'gate-rows：%s\n' "$(tr '\n' ' ' <"$GATE_ROWS")"
@@ -334,7 +334,7 @@ run_page() {   # $1 = scenario token, $2 = nav|nonav, $3 = run 名
   local token="$1" mode="$2" name="${3:-$1}"
   export RESULT_FILE="$TMPD/${LEGTAG}-${name}.out"
   export EXPECT_CHECKS="$(expect_checks "$name")"
-  [ -n "$EXPECT_CHECKS" ] || { echo "  RED $LEGTAG/$name：BROWSER_EXPECTS 里没有这一份报告的条数（新 run 要正面钉一条）" >&2; FAILED=1; }
+  [ -n "$EXPECT_CHECKS" ] || { echo "  RED $LEGTAG/${name}：BROWSER_EXPECTS 里没有这一份报告的条数（新 run 要正面钉一条）" >&2; FAILED=1; }
   if [ "$mode" = nav ]; then
     node tools/playtest.mjs eval "@$token" >"$RESULT_FILE" 2>"$TMPD/${LEGTAG}-${name}.console.log"
   else
@@ -407,7 +407,7 @@ if [ "$PARTIAL_BROWSER" = 0 ]; then
     [ -n "$(expect_checks "$n")" ] || { echo "  RED 条数钉表缺 $n 这一份报告（新 run 没被钉住）" >&2; FAILED=1; }
   done
   for n in $(printf '%s\n' $BROWSER_EXPECTS | sed 's/=.*//'); do
-    case " $RUN_NAMES " in *" $n "*) ;; *) echo "  RED 条数钉表钉着 $n，可腿计划里已经没有它了（死行：这份报告根本不跑）" >&2; FAILED=1 ;; esac
+    case " $RUN_NAMES " in *" $n "*) ;; *) echo "  RED 条数钉表钉着 ${n}，可腿计划里已经没有它了（死行：这份报告根本不跑）" >&2; FAILED=1 ;; esac
   done
   N_PIN=$(printf '%s\n' $BROWSER_EXPECTS | wc -l | tr -d ' ')
   N_RUN=$(printf '%s\n' $RUN_NAMES | wc -l | tr -d ' ')
@@ -416,7 +416,7 @@ if [ "$PARTIAL_BROWSER" = 0 ]; then
     FAILED=1
   fi
 else
-  echo "NOTE 部分腿模式（LEGS=$LEGS）：逐名相等的检查跳过，全套请不带 LEGS 跑（每份报告的条数照旧比对）"
+  echo "NOTE 部分腿模式（LEGS=${LEGS}）：逐名相等的检查跳过，全套请不带 LEGS 跑（每份报告的条数照旧比对）"
 fi
 
 if [ "$SELF" = 1 ]; then
@@ -433,7 +433,7 @@ if [ "$SELF" = 1 ]; then
   DERIVED=$EXPECTED
   EXPECTED=$((EXPECTED * ${#SHAPES[@]}))
   if [ "$DERIVED" != "$GOLDEN_PER_SHAPE" ]; then
-    echo "  RED 腿计划现算出每形态 $DERIVED 份报告，钉着的 golden 是 $GOLDEN_PER_SHAPE：\
+    echo "  RED 腿计划现算出每形态 $DERIVED 份报告，钉着的 golden 是 ${GOLDEN_PER_SHAPE}：\
 要么 run 被删了，要么你改计划时忘了正面改这个数" >&2
     FAILED=1
   fi
@@ -441,7 +441,7 @@ if [ "$SELF" = 1 ]; then
   HIT=$(awk '$2 > 0' "$REPORTS" | wc -l | tr -d ' ')
   echo "  应有 $EXPECTED 份报告（$DERIVED run x ${#SHAPES[@]} 形态），实到 $GOT 份，其中 $HIT 份点名吃下了种下的错"
   if [ "$GOT" != "$EXPECTED" ]; then
-    echo "  RED 阴性自证的报告数对不上：$GOT ≠ $EXPECTED（有腿没跑，或计划表漂了）" >&2
+    echo "  RED 阴性自证的报告数对不上：$GOT ≠ ${EXPECTED}（有腿没跑，或计划表漂了）" >&2
     FAILED=1
   fi
   if [ "$FAILED" = 0 ]; then
@@ -460,6 +460,6 @@ BRC=$FAILED
 [ $BRC -eq 0 ] && echo "browser: PASS（腿计划每形态 $GOLDEN_PER_SHAPE 份报告，见各 run 日志末尾的 GATE_RC）" \
   || echo "browser: FAILURES ABOVE (rc=$BRC)"
 [ "$LRC" = 0 ] && [ "$BRC" = 0 ] && echo "=== ALL GREEN：logic rc=0 + browser rc=0 ===" \
-  || echo "=== 有闸是红的：logic rc=$LRC, browser rc=$BRC（点名见上面各段的 FAIL/RED 行与 gate-rows）==="
+  || echo "=== 有闸是红的：logic rc=$LRC, browser rc=${BRC}（点名见上面各段的 FAIL/RED 行与 gate-rows）==="
 echo "GATE_RC logic=$LRC browser=$BRC"
 exit $(( LRC + BRC > 0 ? 1 : 0 ))
