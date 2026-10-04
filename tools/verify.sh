@@ -147,8 +147,19 @@ printf '逻辑闸合计 %d 条断言（闸：%s；钉表：%s）\n' "$TOTAL" "$G
 printf 'gate-rows：%s\n' "$(tr '\n' ' ' <"$GATE_ROWS")"
 if [ "$LRC" = 0 ]; then echo "logic: PASS"; else echo "logic: FAIL（红的那道闸上面已点名）"; fi
 
+# 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑。缺这一步就是「本地全绿、线上 404 自己的
+# manifest / sw.js / 图标」这一整类坏法。它不碰 Chrome，也不读页面，纯查产物。
+# 必须排在下面那条 BROWSER 早退之前：`npm test` 那条路走 `exit $LRC`，块挂在文件尾巴时
+# 默认整闸一次都碰不到它——「只有 CI 在查」这个洞只是换了个位置。红并进 LRC，
+# 浏览器那一路的 `exit $((LRC + BRC …))` 与尾巴上的横幅才带得动它。
+echo "=== deploy-set ==="
+node tools/deploy-set.mjs || LRC=1
+node tools/deploy-set-selftest.mjs || LRC=1
+
 if [ "${BROWSER:-0}" != 1 ]; then
   echo "browser: SKIP（逻辑闸段跑完了；浏览器闸走 BROWSER=1 / npm run verify:browser）"
+  [ "$LRC" = 0 ] && echo "=== ALL GREEN（logic + 部署集；浏览器腿这一跑没跑）===" \
+    || echo "=== FAILURES ABOVE (rc=${LRC}) ==="
   exit $LRC
 fi
 echo
