@@ -140,6 +140,17 @@ if [ "$PARTIAL_LOGIC" = 0 ]; then
     echo "RED 钉表 $PINNED_N 条 vs 名单里 $NEED_N 道要条数的闸：有一道闸没被钉住" >&2
     LRC=1
   fi
+  # 名单是手打的，所以"新加一支 test/*.test.mjs"这件事本身不会让任何一道闸红：那条套件不进
+  # GATES 就不会被跑，而 README 的表与 GATES 的逐名相等（doctest 那条）照样绿——两边都自洽、
+  # 分母却缩了。这一段以目录为准数一遍：文件在、名字不在，必须点名红（摘闸则要正面把两处删）。
+  for f in test/*.test.mjs; do
+    [ -e "$f" ] || continue
+    g=$(basename "$f" .test.mjs)
+    case " $GATES " in
+      *" $g "*) ;;
+      *) echo "RED 名单外的套件 $f：闸 $g 不在 GATES 里（新闸要正面加进名单与 README 的表）" >&2; LRC=1 ;;
+    esac
+  done
 else
   echo "NOTE 部分闸模式（GATES=${GATES}）：钉表逐名相等的检查跳过，全套请不带 GATES 跑"
 fi
