@@ -32,6 +32,10 @@ jobs:
       # 出题线不是意见而是测量：这一把重跑唯一性计数与推理深度，48 题全过才算这棵树能合。
       - name: Every shipped level is still uniquely solvable
         run: node test/puzzles.test.mjs
+      # 难度带的出处：accept% 与"往返后复测的深度"都由 test/balance.mjs 现量。它的退出码从这一笔
+      # 起才是结论（以前四档一张板子都接不出，也只是把十列表打完退 0），所以 CI 单独认它一次。
+      - name: Difficulty bands still measure out
+        run: node test/balance.mjs
       # 部署集闸：按 tools/assemble-site.sh 那份清单真拷一遍产物，要求页面会去要的东西
       # 都在里面。这一仓曾经因为清单落后于页面而线上 404 自己的 manifest/sw.js/图标，
       # 而本地一切全绿——因为本地根本没有「按清单拷」这一步。

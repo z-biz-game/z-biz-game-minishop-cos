@@ -118,6 +118,18 @@
 （`tools/sabotage.mjs` 的刀型是"改一处再复原那一个文件"，种一个新文件不在这个形状里），
 对照是手工取的；`GATES=` 点名调试那条通道不触发这段（它和钉表的逐名相等一样只在跑全套时要求）。
 
+### 实测台 `test/balance.mjs`：不进 7 道闸的名单，但它的退出码是结论
+
+它量的是"这一档还量不量得出板子"：每档 SEEDS 个种子的 accept%、单张板子的证明成本、
+全池复证、擦线索两遍。以前某档一张板子都接不出，它也只是把那张表打完然后退 0——
+而「改 `js/core/make.js` 的 band 之前先跑这个文件」这句话指望的正是这个退出码。
+现在两条结论进 `fails`：某档 accept 为 0；以及**往返之后**（`serialize` → `deserialize`）复测的深度
+落出自己那一档的 k 带——后一条是第二只眼睛，出题器自报"这张在带里"不作数。
+两个方向都取过：把近岸的 `k: [0, 0]` 改成 `[7, 7]` → 点名 `FAIL balance: harbour：… 一张板子都没接受`、
+rc=1；把 `js/core/make.js` 里那道深度比较改成恒假 → 复测深度不在带里的档逐个点名、rc=1；
+未动刀的那份 rc=0（对照台账在仓库外的 `_scratch/mshop-bal/`）。CI 里它是
+`Every shipped level is still uniquely solvable` 之后单独一步，本地就是 `npm run balance`。
+
 ### 浏览器闸（每种 URL 形态 11 份报告 × 2 种形态）
 
 形态是 `http://127.0.0.1:5275/`（根）与 `http://127.0.0.1:5275/z-biz-game-minishop-cos/`
@@ -160,6 +172,7 @@
 |---|---|---|
 | 每一题解数 = 1 | `js/core/count.js` 穷举，`test/puzzles.test.mjs` 逐题重跑 | `node test/puzzles.test.mjs` |
 | 每一题的深度 = 它印出来的 k | `js/core/logic.js` 只用局部规则求解 | 同上（同一道闸） |
+| 难度带还量得出板子、往返后深度还在带里 | `test/balance.mjs` 现量 accept% 与 serialize→deserialize 后的复测深度 | `node test/balance.mjs`（CI 里独立一步） |
 | 文档里印的每个现值 = 代码里的现在值 | `test/doctest.test.mjs` | `node test/doctest.test.mjs` |
 | 每条断言都被证明"会红" | `tools/sabotage.mjs` 六把刀 | `node tools/sabotage.mjs` |
 | 变窄（删断言/摘闸）当场显形 | `LOGIC_EXPECTS` + `BROWSER_EXPECTS` + `GOLDEN_PER_SHAPE` | `bash tools/verify.sh` |
@@ -175,6 +188,7 @@ bash tools/verify.sh          # 逻辑闸
 BROWSER=1 bash tools/verify.sh # 再加真浏览器闸（要 Chrome；两种 URL 形态）
 node tools/sabotage.mjs        # 破坏试验台账（会打刀，工作树必须干净）
 node tools/bake.mjs            # 重新测量 48 题（出题线，跑之前先读文件头）
+npm run balance                # 难度实测台：某档量不出板子、或往返后深度漂出带就 rc=1
 ```
 
 零运行时依赖：`dependencies` 与 `devDependencies` 都是空对象，页面是裸 ES module，

@@ -28,6 +28,10 @@ const ms = (ns) => Number(ns) / 1e6;
 const pad = (s, n) => String(s).padEnd(n);
 const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(1)}%` : 'n/a');
 
+// 这张表以前只打印不表态：一档接不出一张板子，它照样把十列表打完然后 rc=0，而"改 band 之前
+// 先跑这个文件"这句话指望的就是这个 rc。
+const fails = [];
+
 const hr = (fn, times) => {
   const t0 = process.hrtime.bigint();
   for (let i = 0; i < times; i++) fn(i);
@@ -62,6 +66,7 @@ for (const tier of TIERS) {
     .sort((a, b) => b[1] - a[1])
     .map(([k, n]) => `${k}:${n}`);
   bands.push({ tier, attempts, accepted, got, secs, rejects });
+  if (!accepted) fails.push(`${tier.key}：${SEEDS} 个种子一张板子都没接受 —— band 量不出难度，这张表在说谎`);
   console.log(row([
     tier.key,
     `${tier.rows}x${tier.cols}`,
@@ -97,6 +102,10 @@ for (const { tier, got } of bands) {
   const cNodes = Math.max(...specs.map((s) => countSolutions(s, 2, { nodes: tier.countNodes }).nodes));
   const lMs = hr((i) => solveLogic(specs[i % specs.length], { maxDepth: tier.k[1] + 1, nodes: tier.logicNodes }), 40);
   const L = specs.map((s) => solveLogic(s, { maxDepth: tier.k[1] + 1, nodes: tier.logicNodes }));
+  // 第二只眼睛：makePuzzle 自报"这张在 band 里"，这里把 serialize→deserialize 之后的同一批
+  // spec 重新量一遍深度。往返掉了信息时，band 就只存在于出货前的那份内存里。
+  const offBand = L.filter((x) => !x.solved || x.depth < tier.k[0] || x.depth > tier.k[1]).length;
+  if (offBand) fails.push(`${tier.key}：${offBand}/${L.length} 张往返后复测的深度不在 k=${tier.k[0]}..${tier.k[1]} —— band 不再描述这批板子`);
   console.log(pad(tier.key, 10) + pad(cMs.toFixed(3), 11) + pad(cNodes, 13)
     + pad(lMs.toFixed(3), 11) + pad(L[0].depth, 7) + Math.max(...L.map((x) => x.nodes)));
 }
@@ -207,3 +216,6 @@ console.log('  难度不在这张表里：difficulty 是 depth k，见 tools/bak
 
 console.log('\n结论：难度是量出来的 —— tier 的 k 来自 solveLogic，accept% 来自这张表，');
 console.log('不是任何人手写的标签。改 js/core/make.js 的 band 之前先跑这个文件。\n');
+
+fails.forEach((f) => console.log(`FAIL balance: ${f}`));
+process.exit(fails.length ? 1 : 0);
