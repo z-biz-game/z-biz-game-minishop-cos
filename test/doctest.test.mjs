@@ -244,7 +244,7 @@ const kv = (s) => Object.fromEntries(s.trim().split(/\s+/).map((p) => p.split('=
       'README 承诺 dependencies 与 devDependencies 都是空对象');
   });
   test('README 引用的每个代码路径都还在树上', () => {
-    const refs = [...new Set([...README.matchAll(/`((?:js|tools|test)\/[A-Za-z0-9_./-]+\.(?:mjs|js))`/g)].map((m) => m[1]))];
+    const refs = [...new Set([...README.matchAll(/`((?:js|tools|test)\/[A-Za-z0-9_./-]+\.[A-Za-z][A-Za-z0-9]{0,11})`/g)].map((m) => m[1]))];
     ok(refs.length >= 10, `只抓到 ${refs.length} 个代码路径引用，解析八成空了`);
     for (const p of refs) readFileSync(join(ROOT, p), 'utf8');
   });
