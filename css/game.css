@@ -1,0 +1,154 @@
+/* 孤舰 — one stylesheet, no framework, no build step.
+   Layout: sea on the left, readout on the right; stacked under 820px so a phone gets a
+   full-width chart and a short panel below it. */
+
+:root {
+  --bg: #080d14;
+  --bg-2: #0f1723;
+  --panel: #131c29;
+  --line: rgba(206, 226, 244, 0.10);
+  --ink: #e4ebf3;
+  --ink-dim: #8698ac;
+  --brass: #e6b656;
+  --brass-dim: #7d6327;
+  --wake: #7ec4e8;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: radial-gradient(130% 100% at 50% 0%, var(--bg-2), var(--bg) 62%);
+  color: var(--ink); font-family: var(--mono); -webkit-font-smoothing: antialiased;
+  overflow: hidden; user-select: none; cursor: default;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+
+.topbar { display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.brand { font-size: 16px; letter-spacing: 0.06em; display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+.brand small { color: var(--ink-dim); font-size: 10px; letter-spacing: 0.28em; }
+.brand-mark { color: var(--brass); }
+.modes { display: flex; gap: 4px; }
+.modes button { padding: 6px 14px; font-size: 13px; color: var(--ink-dim); border: 1px solid transparent; border-radius: 6px; }
+.modes button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+.modes button[aria-current="true"] { color: var(--brass); border-color: rgba(230, 182, 86, 0.4); background: rgba(230, 182, 86, 0.08); }
+.totals { margin-left: auto; font-size: 12px; color: var(--ink-dim); }
+.totals b { color: var(--brass); font-weight: 600; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; padding: 18px; height: calc(100% - 53px); }
+.board { position: relative; display: grid; grid-template-rows: 1fr auto; min-height: 0; }
+#sea { width: 100%; height: 100%; min-height: 0; display: block; touch-action: none; }
+.hint-line { min-height: 20px; font-size: 12px; color: var(--ink-dim); text-align: center; }
+.hint-line b { color: var(--wake); font-weight: 600; }
+
+.panel { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+.crumbs { font-size: 12px; color: var(--ink-dim); letter-spacing: 0.04em; }
+.crumbs b { display: block; font-size: 20px; color: var(--ink); font-weight: 600; margin-top: 2px; }
+.crumbs .band { color: var(--brass); }
+
+.readout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.readout > div { border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; background: rgba(255, 255, 255, 0.02); }
+.readout dt { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.14em; }
+.readout dd { font-size: 21px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.readout dd small { font-size: 11px; color: var(--ink-dim); }
+.readout .par dd { color: var(--brass); }
+.readout .best dd { color: var(--wake); }
+.readout .proof dd { color: #8fd6a4; }
+
+/* 6 列：全屏开关接进来后是一行 6 颗（旋转/撤销/提示/重开/分享/全屏），不留半行尾巴。
+   面板 330px − padding 32 − gap 30 = 268px，÷6 ≈ 44px/格，12px 中文两字（24px）放得下。 */
+.controls { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.controls button { padding: 10px 2px; font-size: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, 0.03); color: var(--ink); }
+.controls button:hover:not(:disabled) { border-color: rgba(230, 182, 86, 0.5); color: var(--brass); }
+.controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.shelf { display: flex; flex-wrap: wrap; gap: 6px; }
+.shelf .tier { width: 100%; font-size: 11px; color: var(--ink-dim); margin-top: 6px; letter-spacing: 0.1em; }
+.shelf button { min-width: 34px; padding: 7px 6px; font-size: 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-dim); }
+.shelf button:hover { color: var(--ink); border-color: rgba(206, 226, 244, 0.3); }
+.shelf button.done { color: var(--brass); border-color: rgba(230, 182, 86, 0.35); }
+.shelf button.perfect { color: var(--wake); border-color: rgba(126, 196, 232, 0.35); }
+.shelf button.here { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
+.shelf button:disabled { opacity: 0.28; }
+.shelf .wide { width: 100%; }
+
+.about { font-size: 11px; color: var(--ink-dim); line-height: 1.75; border-top: 1px solid var(--line); padding-top: 10px; }
+.about summary { cursor: pointer; letter-spacing: 0.08em; }
+.about p { margin-top: 8px; }
+.about b { color: var(--ink); }
+.about code { color: var(--brass); font-size: 10px; }
+.about .save { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.about #wipe { font-size: 10px; padding: 5px 9px; color: var(--ink-dim); border-color: rgba(230, 182, 86, 0.4); }
+
+.curtain { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 11, 17, 0.74); backdrop-filter: blur(3px); border-radius: 12px; }
+.curtain[hidden] { display: none; }
+.curtain-card { width: min(310px, 86%); border: 1px solid rgba(230, 182, 86, 0.35); border-radius: 14px; background: var(--bg-2); padding: 22px; text-align: center; }
+.stars { font-size: 26px; letter-spacing: 0.2em; color: var(--brass); }
+.curtain-card h2 { font-size: 19px; margin: 6px 0 8px; }
+.tally { font-size: 12px; color: var(--ink-dim); line-height: 1.8; }
+.tally b { color: var(--ink); }
+.curtain-actions { display: flex; gap: 8px; margin-top: 16px; }
+.curtain-actions button { flex: 1; padding: 10px; font-size: 13px; border: 1px solid var(--line); border-radius: 9px; }
+.curtain-actions .primary { border-color: rgba(230, 182, 86, 0.6); color: var(--brass); background: rgba(230, 182, 86, 0.1); }
+
+.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-2); font-size: 12px; color: var(--brass); }
+.toast[hidden] { display: none; }
+
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .stage { grid-template-columns: 1fr; height: auto; }
+  .board { height: 62vh; min-height: 340px; }
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .totals { margin-left: 0; width: 100%; }
+}
+
+/* 中央分发：safe-area 兜底 */
+
+/* ---------- safe-area：刘海与主屏条不吃掉按钮（中央分发，akari-cos 同口径） ---------- */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+html, body {
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+body {
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* 贴边的固定/吸底元素自己让开主屏条，别让 home indicator 压住按钮 */
+.fixed-bottom, .bottom-bar, .hud-bottom, footer.app-footer {
+  padding-bottom: calc(var(--sab) + env(safe-area-inset-bottom, 0px));
+}
+
+
+/* ============================================================
+   44px 触摸命中下限（Apple HIG 手机可用性底线）
+   每个真正可点的元素都要有 ≥44×44 CSS px 的命中盒。
+   min-height / min-width 是**硬下限**：只会把过小的盒子撑到 44px，
+   本来就够大的控件（宽药丸、整行列表项、大数字键）外形一点不变。
+
+   两处非平凡之处：
+   1) 需要 !important —— 各组件自己有 `.shelf button { min-width: 34px }`
+      这类更"贴身"的规则，类选择器的优先级高于任何标签堆叠，
+      不加的话这条底线会被组件规则逐个抵消。
+   2) 先把 --touch-min 定死：tapa / nurikabe 早就写了
+      `min-height: var(--touch-min)`，但全仓没有任何地方定义过这个变量，
+      无 fallback 的 var() 在计算值阶段整条作废 —— 那是个看着像 44px、
+      实际什么都不保证的死规则。这里补上定义，让它们原本的意图真正成立。
+   ============================================================ */
+:root { --touch-min: 44px; }
+button,
+select,
+input,
+textarea,
+a[href],
+[role="button"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}

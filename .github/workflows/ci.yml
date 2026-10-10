@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  logic:
+    name: eight logic gates + pinned assertion counts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 不 npm install：这个仓的 dependencies 与 devDependencies 都是空对象（README 里那句话由
+      # doctest 盯着）。为一个不需要打包的游戏往 CI 里拉 node_modules，下次网络抖一下就红给你看。
+      - name: All logic gates (verify.sh default run)
+        run: bash tools/verify.sh
+
+      # 单独再跑一次文档闸：它红的时候，最想要的读数就是"哪张表的哪一格漂了"，
+      # 混在八道闸的输出里会被上面那段刷掉。
+      - name: Docs are asserted surface
+        run: node test/doctest.test.mjs
+
+      # 出题线不是意见而是测量：这一把重跑唯一性计数与推理深度，48 题全过才算这棵树能合。
+      - name: Every shipped level is still uniquely solvable
+        run: node test/puzzles.test.mjs
+      # 难度带的出处：accept% 与"往返后复测的深度"都由 test/balance.mjs 现量。它的退出码从这一笔
+      # 起才是结论（以前四档一张板子都接不出，也只是把十列表打完退 0），所以 CI 单独认它一次。
+      - name: Difficulty bands still measure out
+        run: node test/balance.mjs
+      # 部署集闸：按 tools/assemble-site.sh 那份清单真拷一遍产物，要求页面会去要的东西
+      # 都在里面。这一仓曾经因为清单落后于页面而线上 404 自己的 manifest/sw.js/图标，
+      # 而本地一切全绿——因为本地根本没有「按清单拷」这一步。
+      - name: Deploy set gate
+        run: node tools/deploy-set.mjs
+      # 阴性自证：每一类断言当场被打红一次，闸必须点名吃掉那一刀；写在注释里的假路径
+      # 必须不算引用。钉住的条数由这一跑证明它真的会红，不是由记性证明。
+      - name: Deploy set gate proves it can fail
+        run: node tools/deploy-set-selftest.mjs
+
+  browser:
+    name: real browser gate (both URL shapes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 台架是裸 CDP 驱动，用的是 Node 21+ 才有的全局 WebSocket/fetch；在 20 上第一次 attach
+      # 就死在 "WebSocket is not defined"，一条断言都跑不到。
+      # verify.sh 自己起 server，两种 URL 形态（根 / 与 Pages 的 /z-biz-game-minishop-cos/）
+      # 在同一台 Chrome、各自独立的 --user-data-dir 上跑同一套腿计划；每份报告的条数还要等于
+      # BROWSER_EXPECTS 里钉着的那个数。
+      - name: Browser gate, both local URL shapes
+        env:
+          WD_TIMEOUT: 900
+        run: bash tools/verify.sh
+
+      # 阴性自证：闸必须能被证明"会红"。种一条注定错的期望，必须每份报告都点名吃下它并且 rc 非 0。
+      - name: Gate proves it can fail
+        env:
+          WD_TIMEOUT: 900
+        run: |
+          set +e
+          GATE_SELFTEST=1 bash tools/verify.sh > _tmp-selftest.log 2>&1
+          rc=$?
+          set -e
+          echo "rc=$rc"
+          tail -25 _tmp-selftest.log; grep -E '应有|点名吃下|ok 闸|RED' _tmp-selftest.log | tail -10
+          [ "$rc" -ne 0 ] || { echo "SELFTEST 竟然全绿：这个闸证明不了自己会红"; exit 1; }
+          grep -q 'FAIL' _tmp-selftest.log || { echo "SELFTEST 红了但没有点名是哪条断言"; exit 1; }
+
+      # 破坏试验台账：六把刀必须各自把闸打红，并且恢复之后工作树还是干净的。
+      # 刀只打在内存里那份字节上，恢复不走 git checkout/restore/reset。
+      - name: Sabotage ledger — every knife must drive a gate red
+        env:
+          WD_TIMEOUT: 900
+        run: |
+          node tools/sabotage.mjs
+          git diff --exit-code || { echo "台账跑完工作树是脏的：某一刀没把它的靶恢复回去"; exit 1; }

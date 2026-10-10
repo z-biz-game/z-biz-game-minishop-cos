@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0b1119">
+<meta name="description" content="孤舰：把一支舰队摆进海图。每一关的唯一解由穷举量出，推理深度由逻辑求解器量出。"><meta property="og:title" content="孤舰 · MINISHIP"><meta property="og:description" content="孤舰：把一支舰队摆进海图。每一关的唯一解由穷举量出，推理深度由逻辑求解器量出。"><meta property="og:image" content="https://z-biz-game.github.io/z-biz-game-minishop-cos/icons/icon-512.png"><meta name="twitter:image" content="https://z-biz-game.github.io/z-biz-game-minishop-cos/icons/icon-512.png">
+<link rel="icon" href="data:,">
+<title>孤舰 · MINISHIP</title>
+<link rel="stylesheet" href="css/game.css">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+<header class="topbar">
+  <h1 class="brand"><span class="brand-mark">⚓</span>孤舰<small>MINISHIP</small></h1>
+  <nav class="modes" id="modes" aria-label="模式">
+    <button type="button" data-mode="campaign">战役</button>
+    <button type="button" data-mode="daily">每日</button>
+    <button type="button" data-mode="random">随机</button>
+  </nav>
+  <p class="totals" id="totals"></p>
+</header>
+
+<main class="stage">
+  <section class="board">
+    <canvas id="sea" aria-label="海图：舰队与水深线索"></canvas>
+    <p class="hint-line" id="hintline"></p>
+    <div class="curtain" id="curtain" hidden>
+      <div class="curtain-card">
+        <p class="stars" id="stars"></p>
+        <h2 id="verdict"></h2>
+        <p class="tally" id="tally"></p>
+        <div class="curtain-actions">
+          <button type="button" id="again">再来一次</button>
+          <button type="button" id="next" class="primary">下一关</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <p class="crumbs" id="crumbs"></p>
+    <dl class="readout" id="readout"></dl>
+    <div class="controls">
+      <button type="button" id="rotate">旋转</button>
+      <button type="button" id="undo">撤销</button>
+      <button type="button" id="hint">提示</button>
+      <button type="button" id="restart">重开</button>
+      <button type="button" id="share">分享</button>
+      <button type="button" id="btn-fullscreen" aria-pressed="false" title="全屏 (F)">全屏</button>
+    </div>
+    <div class="shelf" id="shelf"></div>
+    <!--
+      玩法说明。下面每一条都对着 js/core/check.js 的 validate() 逐项写：
+      目标/线索含义出自 SPEC 的行列表（model.js:3-7），
+      六条判据与它们不成立时的原话出自 check.js 的文件头注释与 validate()。
+      改 check.js 的判据时这个块要跟着改——它不是另一套规则，是同一套规则的人话。
+    -->
+    <details class="about">
+      <summary>玩法：怎么摆才算对</summary>
+      <p><b>目标</b>：把这一关舰队清单里的每条船都摆进海图，让每一行的、每一列的数字同时兑现。数字全对上、且没有两条船挨着，这一关就成了。</p>
+      <p><b>线索怎么读</b>：海图左边的数字是<b>这一行</b>要被船占住的格子数，上边的数字是<b>这一列</b>要占住的格数。写着 <code>-</code> 的行/列是自由行自由列（<code>FREE = -1</code>，<code>js/core/model.js:19</code>），它不约束占格数。</p>
+      <p><b>怎么操作</b>：从右边的架子上把一条船<b>拖</b>进海图，它会横放；按「旋转」改成竖放，再拖到位。在空白海图上单击一下是标记水（<code>UNKNOWN / SHIP / WATER</code> 三态，<code>js/core/model.js:7</code>）。撤销只退你动过的一步。</p>
+      <p><b>判对判错由谁说</b>：<code>js/core/check.js</code> 是独立检查器——它不碰位掩码、不碰行计划、不 import 计数器与求解器，只用嵌套循环和一张朴素占格表把上面那句话重新推一遍。它按顺序查六件事，任何一件不对就报一句人话：</p>
+      <ol>
+        <li>题面自洽：Σ行线索 = Σ列线索 = Σ船长。</li>
+        <li>每条船都在图内。</li>
+        <li>两条船不共格。</li>
+        <li>两条船不挨着——<b>边和角都算</b>（Akaji 规则）。</li>
+        <li>每条受约束的行/列恰好占那么多个格。</li>
+        <li>放下船长度的多重集正好是舰队清单。</li>
+      </ol>
+      <p>第 1 条那条恒等式是地基：数同一批格子的三种方法必须互相同意，否则这道题根本不描述任何一支舰队。</p>
+    </details>
+    <details class="about">
+      <summary>这一关的数字从哪来</summary>
+      <p>解数由 <code>js/core/count.js</code> 逐行穷举证出：数字是 1 就意味着它走完了每一种可能，只找到一种摆法。<b>船与船不得相邻，斜角也算相邻</b>——这条规则写进了求解、校验和绘制三处，改了它解数就会变。</p>
+      <p>推理深度由 <code>js/core/logic.js</code> 量出：只用局部推理能走完就是 0 层；需要假设一处才走得下去是 1 层，以此类推。两个计数分开放：<b>操作数</b>算你动过的每一步（包括点水），<b>放置步数</b>只算落下的船，它的下限就是船数。</p>
+      <p>关卡来自 <code>node tools/bake.mjs</code>：构建期随机摆舰队 → 读出行列线索 → 验唯一 → 跑逻辑求解器拿深度，只有全部复现的才写进 <code>js/data/puzzles.js</code>。浏览器本身不做生成。</p>
+      <p class="save">成绩只存在这台设备的浏览器里。<button type="button" id="wipe">清空存档</button></p>
+    </details>
+  </aside>
+</main>
+
+<p class="toast" id="toast" hidden></p>
+<script type="module" src="js/main.js"></script>
+  <script src="js/sw-register.js"></script>
+</body>
+</html>

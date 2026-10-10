@@ -1,0 +1,45 @@
+{
+  "name": "minishop",
+  "version": "1.0.0",
+  "description": "孤舰 MINISHIP — 浏览器原生舰队海图推理. 每一关的解数 = 1 由逐行穷举计数器证明, 推理深度 k 由只用局部规则的逻辑求解器量出.",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "serve": "node server.cjs 5275",
+    "dev": "node server.cjs 5275",
+    "electron": "electron .",
+    "bake": "node tools/bake.mjs",
+    "balance": "node test/balance.mjs",
+    "check": "for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check \"$f\" || exit 1; done && echo OK",
+    "unit": "for f in test/*.test.mjs; do node \"$f\" || exit 1; done",
+    "test": "npm run check && npm run unit",
+    "verify": "bash tools/verify.sh",
+    "verify:browser": "BROWSER=1 bash tools/verify.sh",
+    "sabotage": "node tools/sabotage.mjs",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
+  },
+  "keywords": [
+    "game",
+    "puzzle",
+    "battleship",
+    "akashi",
+    "uniqueness-proof",
+    "logic",
+    "deduction",
+    "zero-dependency",
+    "electron"
+  ],
+  "author": "z-biz-game",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {},
+  "build": {
+    "appId": "com.zbiz.minishop",
+    "productName": "Minishop",
+    "mac": { "category": "public.app-category.puzzle-games" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage" }
+  }
+}
