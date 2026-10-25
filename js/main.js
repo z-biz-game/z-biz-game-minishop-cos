@@ -16,6 +16,10 @@ import {
 import { todayKey } from './core/rng.js';
 import { draw } from './core/model.js';
 import { createView } from './view.js';
+// 听觉与触觉这两路反馈：视觉与数值之外，桌面上还该有"听得见"的一路。
+// 音频模块自己管手势解锁与真静音（suspend），这里只管把音接到引擎的判定上。
+import { audio } from './audio.js';
+import { haptics } from './haptics.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -35,6 +39,8 @@ const app = {
   game: null,
   label: '',
   day: null,
+  // 这一局赢过没有：通关声只响一次（见 finish()）。
+  won: false,
 };
 
 function clampIndex(n) {
@@ -92,6 +98,7 @@ function setGame(puzzle, label) {
   app.puzzle = puzzle;
   app.label = label || app.label;
   app.game = createGame(puzzle);
+  app.won = false;              // 上一局赢过不算数：这一局还没赢
   view.attach(app.game);
   el.curtain.hidden = true;
   say('');
@@ -204,12 +211,25 @@ const REASONS = {
   nope: '没有这艘船',
 };
 
+// 声音接在**引擎的判定分支**上，不是接在"手指碰过屏幕"上：
+//   · place() 收了这一放 → correct；place() 拒了（越界 / 重叠 / 相邻 / 这局已完成）→ wrong
+//   · retrieve() 收了 → move；retrieve() 拒了 → blocked
+//   · rotate() 收了 → move；原地转不开（引擎拒了）→ wrong
+//   · tapCell() 标水 / 擦水点 → tap；这一格本来就没有可标可擦的 → 不出声
+//   · 这一盘解完了（game.done）→ win，而且只响一次
 function commitPlace(i, r, c) {
   const res = place(app.game, i, r, c);
   if (!res.ok) {
     view.redraw();
     say(`落子被拒：${REASONS[res.reason] || res.reason}`);
+    audio.play('wrong');
+    haptics.wrong();
     return res;
+  }
+  // 这一放正好解完这盘：只出通关那一声，不和 correct 叠在一起（一次用户动作一声）。
+  if (!app.game.done) {
+    audio.play('correct');
+    haptics.correct();
   }
   after(`放下第 ${i + 1} 条船 · 操作 ${app.game.ops} · 放置 ${app.game.steps}`);
   return res;
@@ -218,8 +238,12 @@ function commitPlace(i, r, c) {
 function commitRetrieve(i) {
   if (!retrieve(app.game, i)) {
     view.redraw();
+    audio.play('blocked');       // 引擎不收：这一艘不在盘上
+    haptics.wrong();
     return false;
   }
+  audio.play('move');
+  haptics.tap();
   after(`取回第 ${i + 1} 条船 · 操作 ${app.game.ops}（放置步数不减：${app.game.steps}）`);
   return true;
 }
@@ -229,8 +253,12 @@ function commitRotate(i) {
   if (!rotate(app.game, i)) {
     view.redraw();
     say('这一艘原地转不开 —— 旋转被拒');
+    audio.play('wrong');
+    haptics.wrong();
     return false;
   }
+  audio.play('move');
+  haptics.tap();
   view.redraw();
   renderCrumbs();
   say(`旋转第 ${i + 1} 条船 · 免费：操作仍是 ${app.game.ops}，放置仍是 ${app.game.steps}`);
@@ -243,6 +271,8 @@ function commitTap(r, c) {
     view.redraw();
     return false;
   }
+  audio.play('tap');             // 标水 / 擦水点：一记轻音
+  haptics.tap();
   const prog = progress(app.game);
   after(`${what === 'water' ? `(${r},${c}) 标水` : `(${r},${c}) 擦掉水点`} · 操作 ${app.game.ops} · 放置步数不变 ${app.game.steps}`
     + ` · 已放 ${prog.placed}/${prog.fleet}`);
@@ -261,6 +291,12 @@ function after(line) {
 function finish() {
   const puzzle = app.puzzle;
   const g = app.game;
+  // 通关只响一次：这一盘解完之后玩家还能继续摆，每摆一下都重播通关声是吵的。
+  if (!app.won) {
+    app.won = true;
+    audio.play('win');
+    haptics.correct();
+  }
   const rec = store.solve(puzzle.id, { ops: g.ops, steps: g.steps, par: g.par, hints: g.hints });
   if (app.day) store.markDaily(app.day, puzzle.id);
   let nextIndex = 0;
@@ -352,6 +388,8 @@ el.modes.addEventListener('click', (ev) => {
 
 el.undo.addEventListener('click', () => {
   if (undo(app.game)) {
+    audio.play('move');         // 海图退了一步
+    haptics.tap();
     el.curtain.hidden = true;
     view.redraw();
     renderCrumbs();
@@ -372,8 +410,12 @@ el.hint.addEventListener('click', () => {
   const h = hint(app.game);
   if (!h) {
     say('没有可提示的了 —— 这张海图已经完成');
+    audio.play('wrong');        // 引擎说没有可提示的了
+    haptics.wrong();
     return;
   }
+  audio.play('move');           // 提示：只说该放哪，不代放
+  haptics.tap();
   app.game.hints++; // 计费写在 grade() 读的那一个计数器上：另立一个 app.hints 会让「用过提示」这件事在评星眼里从没发生过
   if (h.kind === 'ship') {
     // Highlight the hull that belongs there: the one already sitting somewhere else with
@@ -393,6 +435,9 @@ el.hint.addEventListener('click', () => {
 
 function restart() {
   reset(app.game);
+  app.won = false;            // 重开就是新的一局：通关声重新算一次
+  audio.play('move');
+  haptics.tap();
   el.curtain.hidden = true;
   view.attach(app.game); // clears the selection and the rebound flash along with the hulls
   render();
@@ -587,4 +632,27 @@ window.minishop = {
   window.addEventListener('webkitfullscreenchange', sync);
   window.addEventListener('MSFullscreenChange', sync);
   sync();
+})();
+
+// ---- 音效开关（#btn-sound）----
+//
+// 静音走 `audio.setMuted(true)`，那是 `ctx.suspend()`：整个 AudioContext 挂起。
+// **不许**改成像"把 master.gain 拧到 0"那样 —— 只拧 gain 是假静音：节点照建、时钟照跑，
+// 取消静音之后还有一截尾巴在响。真正的静音必须是挂起整个上下文。
+//
+// 按钮找不到就不装（和全屏那一条同一条纪律）：留一串没人按的代码等于没做这个功能。
+(function bindSound() {
+  const btn = document.getElementById('btn-sound');
+  if (!btn) return;
+  function paint() {
+    const on = !audio.muted;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '音效：开' : '音效：关';
+    btn.title = on ? '点击关闭音效' : '点击开启音效';
+  }
+  btn.addEventListener('click', () => {
+    audio.setMuted(!audio.muted);
+    paint();
+  });
+  paint();
 })();
